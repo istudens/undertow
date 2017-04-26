@@ -19,6 +19,7 @@
 package io.undertow.servlet.core;
 
 import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.HashSet;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -95,7 +96,17 @@ public class SessionListenerBridge implements SessionListener {
 
     private void doDestroy(Session session) {
         final HttpSessionImpl httpSession = SecurityActions.forSession(session, servletContext, false);
-        applicationListeners.sessionDestroyed(httpSession);
+        if (System.getSecurityManager() == null) {
+            applicationListeners.sessionDestroyed(httpSession);
+        } else {
+            AccessController.doPrivileged(new PrivilegedAction<Void>() {
+                @Override
+                public Void run() {
+                    applicationListeners.sessionDestroyed(httpSession);
+                    return null;
+                }
+            });
+        }
         //we make a defensive copy here, as there is no guarantee that the underlying session map
         //is a concurrent map, and as a result a concurrent modification exception may be thrown
         HashSet<String> names = new HashSet<>(session.getAttributeNames());
